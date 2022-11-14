@@ -9,6 +9,8 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
+pub(crate) mod pose;
+
 // WebXR <-> Bevy XR Conversion
 pub(crate) trait XrFrom<T> {
     fn xr_from(_: T) -> Self;
