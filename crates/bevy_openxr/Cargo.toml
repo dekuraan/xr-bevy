@@ -56,7 +56,7 @@ openxr = { version = "0.17.1", default-features = false, features = ["loaded"] }
 openxr = { version = "0.17.1", default-features = false, features = ["static"] }
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
-wgpu = { version = "0.13.1" }
+wgpu = { version = "0.14.0" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 openxr = { version = "0.17.1", default-features = false, features = ["static"] }

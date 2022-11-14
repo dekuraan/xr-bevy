@@ -26,4 +26,4 @@ bevy_utils = { path = "../bevy_utils", version = "0.8.0" }
 # other
 downcast-rs = "1.2"
 serde = "1"
-wgpu = { version = "0.13.1" }
+wgpu = { version = "0.14.0" }
