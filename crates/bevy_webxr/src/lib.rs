@@ -1,5 +1,7 @@
 use bevy_app::Plugin;
 use js_sys::Boolean;
+use js_sys::Reflect;
+use std::rc::Rc;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
@@ -82,9 +84,47 @@ pub struct WebXrPlugin;
 
 impl Plugin for WebXrPlugin {
     fn build(&self, app: &mut bevy_app::App) {
+        let window = gloo_utils::window();
         let webxr_context = app
             .world
             .get_non_send_resource_mut::<WebXrContext>()
             .expect("Webxr context has to be inserted before `app.run()`");
+        let session: &web_sys::XrSession = webxr_context.session.as_ref();
+
+        let document = window.document().unwrap();
+
+        let canvas = document
+            .get_element_by_id("canvas")
+            .unwrap()
+            .dyn_into::<web_sys::HtmlCanvasElement>()
+            .unwrap();
+
+        let gl_attribs = js_sys::Object::new();
+
+        Reflect::set(
+            &gl_attribs,
+            &JsValue::from_str("xrCompatible"),
+            &JsValue::TRUE,
+        )
+        .unwrap();
+
+        let gl = Rc::new(
+            canvas
+                .get_context_with_context_options("webgl2", &gl_attribs)
+                .expect("Can get webgl2 context from canvas")
+                .unwrap()
+                .unchecked_into::<web_sys::WebGl2RenderingContext>(),
+        );
+
+        let mut state = web_sys::XrRenderStateInit::new();
+
+        let base_layer =
+            web_sys::XrWebGlLayer::new_with_web_gl2_rendering_context(&webxr_context.session, &gl)
+                .expect("can get base layer");
+
+        state.base_layer(Some(&base_layer));
+
+        session.update_render_state_with_state(&state);
+        bevy_log::info!("ayo?");
     }
 }
