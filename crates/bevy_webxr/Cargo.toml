@@ -20,11 +20,14 @@ bevy_log = { path = "../bevy_log", version = "0.8.0-dev" }
 bevy_math = { path = "../bevy_math", version = "0.8.0-dev" }
 bevy_utils = { path = "../bevy_utils", version = "0.8.0-dev" }
 bevy_xr = { path = "../bevy_xr", version = "0.8.0-dev" }
+bevy_render = { path = "../bevy_render", version = "0.8.0-dev" }
 console_error_panic_hook = "0.1.7"
 gloo-utils = "0.1.5"
 js-sys = "0.3.60"
 wasm-bindgen = "0.2.0"
 wasm-bindgen-futures = "0.4.33"
+wgpu = {version = "0.13.1",features = ["webgl"]}
+raw-window-handle = "0.4.2"
 
 # other
 web-sys = { version = "0.3", features = [

@@ -1,7 +1,10 @@
+use bevy_app::App;
 use bevy_app::Plugin;
 use js_sys::Boolean;
-use js_sys::Reflect;
+use raw_window_handle;
+use std::cell::RefCell;
 use std::rc::Rc;
+use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
@@ -50,7 +53,11 @@ impl XrFrom<bevy_xr::XrSessionMode> for web_sys::XrSessionMode {
 }
 
 pub struct WebXrContext {
-    session: web_sys::XrSession,
+    pub session: Rc<RefCell<web_sys::XrSession>>,
+    pub canvas: Canvas,
+    // adapter: Adapter,
+    // device: Arc<Device>,
+    // queue: Queue,
 }
 
 impl WebXrContext {
@@ -75,7 +82,12 @@ impl WebXrContext {
             .await?
             .dyn_into::<web_sys::XrSession>()?;
 
-        Ok(WebXrContext { session })
+        let canvas = Canvas::default();
+
+        Ok(WebXrContext {
+            session: Rc::new(RefCell::new(session)),
+            canvas,
+        })
     }
 }
 
@@ -84,47 +96,143 @@ pub struct WebXrPlugin;
 
 impl Plugin for WebXrPlugin {
     fn build(&self, app: &mut bevy_app::App) {
-        let window = gloo_utils::window();
-        let webxr_context = app
-            .world
-            .get_non_send_resource_mut::<WebXrContext>()
-            .expect("Webxr context has to be inserted before `app.run()`");
-        let session: &web_sys::XrSession = webxr_context.session.as_ref();
+        bevy_log::info!("in webxr");
+        app.set_runner(webxr_runner);
+        // let window = gloo_utils::window();
+        // let webxr_context = app
+        //     .world
+        //     .get_non_send_resource_mut::<WebXrContext>()
+        //     .expect("Webxr context has to be inserted before `app.run()`");
+        // // let session: &web_sys::XrSession = webxr_context.session.as_ref();
+        // // let mut state = web_sys::XrRenderStateInit::new();
 
-        let document = window.document().unwrap();
+        // // let base_layer =
+        // //     web_sys::XrWebGlLayer::new_with_web_gl2_rendering_context(&webxr_context.session, &gl)
+        // //         .expect("can get base layer");
 
-        let canvas = document
-            .get_element_by_id("canvas")
-            .unwrap()
-            .dyn_into::<web_sys::HtmlCanvasElement>()
-            .unwrap();
+        // // state.base_layer(Some(&base_layer));
 
-        let gl_attribs = js_sys::Object::new();
-
-        Reflect::set(
-            &gl_attribs,
-            &JsValue::from_str("xrCompatible"),
-            &JsValue::TRUE,
-        )
-        .unwrap();
-
-        let gl = Rc::new(
-            canvas
-                .get_context_with_context_options("webgl2", &gl_attribs)
-                .expect("Can get webgl2 context from canvas")
-                .unwrap()
-                .unchecked_into::<web_sys::WebGl2RenderingContext>(),
-        );
-
-        let mut state = web_sys::XrRenderStateInit::new();
-
-        let base_layer =
-            web_sys::XrWebGlLayer::new_with_web_gl2_rendering_context(&webxr_context.session, &gl)
-                .expect("can get base layer");
-
-        state.base_layer(Some(&base_layer));
-
-        session.update_render_state_with_state(&state);
-        bevy_log::info!("ayo?");
+        // // session.update_render_state_with_state(&state);
+        // app.insert_resource(bevy_render::renderer::RenderDevice::from(
+        //     webxr_context.device.clone(),
+        // ));
     }
 }
+
+//TODO: get rid of rcrefcell and use frame.session
+fn webxr_runner(mut app: App) {
+    let webxr_context = app.world.get_non_send_resource::<WebXrContext>().unwrap();
+    let session = webxr_context.session.clone();
+    type XrFrameHandler = Closure<dyn FnMut(f64, web_sys::XrFrame)>;
+    let f: Rc<RefCell<Option<XrFrameHandler>>> = Rc::new(RefCell::new(None));
+    let g = f.clone();
+    let closure_session = session.clone();
+    *g.borrow_mut() = Some(Closure::new(move |_time: f64, _frame: web_sys::XrFrame| {
+        app.update();
+
+        let session = closure_session.borrow();
+
+        // let base_layer = session.render_state().base_layer().unwrap();
+        // //Reflect hack
+        // let framebuffer: web_sys::WebGlFramebuffer =
+        //     js_sys::Reflect::get(&base_layer, &"framebuffer".into())
+        //         .unwrap()
+        //         .into();
+        // gl.bind_framebuffer(
+        //     web_sys::WebGl2RenderingContext::FRAMEBUFFER,
+        //     Some(&framebuffer),
+        // );
+        // gl.clear_color(1.0, 1.0, 0.0, 1.0);
+        // gl.clear(
+        //     web_sys::WebGl2RenderingContext::COLOR_BUFFER_BIT
+        //         | web_sys::WebGl2RenderingContext::DEPTH_BUFFER_BIT,
+        // );
+        session.request_animation_frame(f.borrow().as_ref().unwrap().as_ref().unchecked_ref());
+    }));
+
+    session
+        .borrow()
+        .request_animation_frame(g.borrow().as_ref().unwrap().as_ref().unchecked_ref());
+}
+
+pub struct Canvas {
+    inner: web_sys::HtmlCanvasElement,
+    id: u32,
+}
+
+impl Canvas {
+    pub fn new_with_id(id: u32) -> Self {
+        let canvas: web_sys::HtmlCanvasElement = web_sys::window()
+            .unwrap()
+            .document()
+            .unwrap()
+            .create_element("canvas")
+            .unwrap()
+            .unchecked_into();
+
+        let body = web_sys::window()
+            .unwrap()
+            .document()
+            .unwrap()
+            .body()
+            .unwrap();
+
+        canvas
+            .set_attribute("data-raw-handle", &id.to_string())
+            .unwrap();
+
+        body.append_child(&web_sys::Element::from(canvas.clone()))
+            .unwrap();
+
+        Self { inner: canvas, id }
+    }
+
+    pub fn create_webgl2_context(
+        &self,
+        // options: ContextCreationOptions,
+    ) -> web_sys::WebGl2RenderingContext {
+        let js_gl_attribs = js_sys::Object::new();
+        js_sys::Reflect::set(
+            &js_gl_attribs,
+            &"xrCompatible".into(),
+            &wasm_bindgen::JsValue::TRUE,
+        )
+        .expect("Failed to set xrCompatible");
+        // WebGL silently ignores any stencil writing or testing if this is not set.
+        // (Atleast on Chrome). What a fantastic design decision.
+        // js_sys::Reflect::set(
+        //     &js_gl_attribs,
+        //     &"stencil".into(),
+        //     &wasm_bindgen::JsValue::from_bool(options.stencil),
+        // )
+        // .expect("Failed to set stencil");
+
+        self.inner
+            .get_context_with_context_options("webgl2", &js_gl_attribs)
+            .unwrap()
+            .unwrap()
+            .dyn_into::<web_sys::WebGl2RenderingContext>()
+            .unwrap()
+    }
+}
+
+impl Default for Canvas {
+    fn default() -> Self {
+        Self::new_with_id(0)
+    }
+}
+
+unsafe impl raw_window_handle::HasRawWindowHandle for Canvas {
+    fn raw_window_handle(&self) -> raw_window_handle::RawWindowHandle {
+        let mut web = raw_window_handle::WebHandle::empty();
+        web.id = self.id;
+
+        raw_window_handle::RawWindowHandle::Web(web)
+    }
+}
+
+// unsafe impl raw_window_handle::HasRawDisplayHandle for Canvas {
+//     fn raw_display_handle(&self) -> raw_window_handle::RawDisplayHandle {
+//         raw_window_handle::RawDisplayHandle::Web(raw_window_handle::WebDisplayHandle::empty())
+//     }
+// }
