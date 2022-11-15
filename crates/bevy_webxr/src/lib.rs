@@ -9,7 +9,9 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
-pub(crate) mod pose;
+pub(crate) mod interaction;
+
+use interaction::tracking::WebXrInteractionContext;
 
 // WebXR <-> Bevy XR Conversion
 pub(crate) trait XrFrom<T> {
@@ -60,11 +62,12 @@ pub struct WebXrContext {
     // adapter: Adapter,
     // device: Arc<Device>,
     // queue: Queue,
+    interaction_ctx: WebXrInteractionContext,
 }
 
 impl WebXrContext {
     /// Get a WebXrContext, you must do this in an async function, so you have to call this before `bevy_app::App::run()` in an async main fn and insett it
-    pub async fn get_context(mode: bevy_xr::XrSessionMode) -> Result<Self, JsValue> {
+    pub async fn get_context(mode: bevy_xr::XrSessionMode, space_type: bevy_xr::interaction::XrReferenceSpaceType) -> Result<Self, JsValue> {
         let mode = mode.xr_into();
         let window = gloo_utils::window();
         let navigator = window.navigator();
@@ -86,9 +89,13 @@ impl WebXrContext {
 
         let canvas = Canvas::default();
 
+        let space = JsFuture::from(session.request_reference_space(space_type)).await?.dyn_into::<web_sys::XrReferenceSpace>()?;
+        let interaction_ctx = WebXrInteractionContext::new(space, space_type);
+
         Ok(WebXrContext {
             session: Rc::new(RefCell::new(session)),
             canvas,
+            interaction_ctx,
         })
     }
 }
