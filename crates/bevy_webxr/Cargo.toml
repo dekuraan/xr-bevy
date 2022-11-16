@@ -24,20 +24,24 @@ bevy_render = { path = "../bevy_render", version = "0.8.0-dev" }
 console_error_panic_hook = "0.1.7"
 gloo-utils = "0.1.5"
 js-sys = "0.3.60"
-wasm-bindgen = "0.2.0"
+wasm-bindgen = "0.2.83"
 wasm-bindgen-futures = "0.4.33"
 wgpu = {version = "0.13.1",features = ["webgl"]}
 raw-window-handle = "0.4.2"
 
-# other
-web-sys = { version = "0.3", features = [
+[dependencies.web-sys]
+version = "0.3.60"
+features = [
     "WebGl2RenderingContext",
     "HtmlCanvasElement",
     "Window",
     "Navigator",
+    "DomPointReadOnly",
+    "DomPointInit",
     "XrBoundedReferenceSpace",
     "XrEye",
     "XrFrame",
+    "XrHand",
     "XrHandedness",
     "XrInputSource",
     "XrInputSourceArray",
@@ -47,6 +51,7 @@ web-sys = { version = "0.3", features = [
     "XrInputSourcesChangeEventInit",
     "XrPose",
     "XrReferenceSpace",
+    "XrBoundedReferenceSpace",
     "XrReferenceSpaceEvent",
     "XrReferenceSpaceEventInit",
     "XrReferenceSpaceType",
@@ -67,4 +72,5 @@ web-sys = { version = "0.3", features = [
     "XrVisibilityState",
     "XrWebGlLayer",
     "XrWebGlLayerInit",
-] }
+]
+

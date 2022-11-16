@@ -1,62 +1,109 @@
-use web_sys;
+use bevy_math::Vec3;
+use std::sync::{Arc, Mutex};
+use wasm_bindgen::JsValue;
 
-use crate::interaction::conversion::*;
-use bevy_xr;
-use bevy::ResMut;
+use crate::XrInto;
 
+use web_sys::{
+    DomPointReadOnly, XrBoundedReferenceSpace, XrFrame, XrHandedness, XrInputSourceArray, XrPose,
+    XrReferenceSpace, XrReferenceSpaceType, XrSession,
+};
 
 pub struct WebXrInteractionContext {
-    space_type: web_sys::XrReferenceSpaceType,
-    space: web_sys::XrReferenceSpace,
-    frame: web_sys::XrFrame,
+    space_type: XrReferenceSpaceType,
+    space: Arc<Mutex<XrReferenceSpace>>,
+    sources: Arc<Mutex<XrInputSourceArray>>,
+    pub frame: Option<XrFrame>,
 }
 
-
 impl WebXrInteractionContext {
-
-    pub fn new(space_type: web_sys::XrReferenceSpaceType, space: web_sys::XrReferenceSpace) -> Self {
+    pub fn new(
+        session: &XrSession,
+        space_type: XrReferenceSpaceType,
+        space: XrReferenceSpace,
+    ) -> Self {
         Self {
             space_type,
-            space,
+            space: Arc::new(Mutex::new(space)),
+            sources: Arc::new(Mutex::new(session.input_sources())),
+            frame: None,
         }
     }
 }
 
-impl bevy_xr::interaction::implementation::XrTrackingSourceBackend for WebXrInteractionContext {
+unsafe impl Send for WebXrInteractionContext {}
+unsafe impl Sync for WebXrInteractionContext {}
+
+pub struct TrackingSource {
+    context: WebXrInteractionContext,
+}
+
+impl bevy_xr::interaction::implementation::XrTrackingSourceBackend for TrackingSource {
     fn reference_space_type(&self) -> bevy_xr::XrReferenceSpaceType {
-        self.space_type.xr_into()
+        self.context.space_type.xr_into()
     }
 
-    fn set_reference_space_type(&self, reference_space_type: XrReferenceSpaceType) -> bool {
+    fn set_reference_space_type(
+        &self,
+        _reference_space_type: bevy_xr::XrReferenceSpaceType,
+    ) -> bool {
         // we can't set a diferent reference_space_type at runtime
         // because WebXr uses a Promise to do that and Bevy doesn't have async capabilities.
         // We can only set this before the App initialization at main function.
-        false         
+        false
     }
 
     fn bounds_geometry(&self) -> Option<Vec<Vec3>> {
-        let space = web_sys::XrBoundedReferenceSpace::from(self.space).ok()?;
+        let space = XrBoundedReferenceSpace::from(
+            <XrReferenceSpace as AsRef<JsValue>>::as_ref(
+                &self.context.space.clone().lock().unwrap(),
+            )
+            .clone(),
+        );
         Some(
-            space.bounds_geometry()
-            .map(|js_value| web_sys::DomPointReadOnly::from(js_value))
-            .map(|point| Vec3::new(point.x(), point.y(), point.z()))
-            .collect()
+            space
+                .bounds_geometry()
+                .to_vec()
+                .iter()
+                .map(|js_value| DomPointReadOnly::from(js_value.clone()))
+                .map(|point| Vec3::new(point.x() as f32, point.y() as f32, point.z() as f32))
+                .collect(),
         )
     }
 
     fn views_poses(&self) -> Vec<bevy_xr::XrPose> {
-        self.space.  
+        todo!()
     }
 
-    fn hands_pose(&self) -> [Option<bevy_xr::XrPose>; 2]{}
+    fn hands_pose(&self) -> [Option<bevy_xr::XrPose>; 2] {
+        if let Some(frame) = &self.context.frame {
+            let left_hand_input_src = {self.context.sources.clone()}.lock().unwrap().get(0);
+            let right_hand_input_src = {self.context.sources.clone()}.lock().unwrap().get(1);
 
-    fn hands_skeleton_pose(&self) -> [Option<Vec<bevy_xr::XrJointPose>>; 2]{}
+            let base_space = self.context.space.clone();
+            let base_space = base_space.lock().unwrap();
 
-    fn hands_target_ray(&self) -> [Option<bevy_xr::XrPose>; 2]{}
+            return [
+                left_hand_input_src.map(|src| {
+                    frame.get_pose(&src.grip_space().unwrap(), &base_space).unwrap().xr_into()
+                }),
+                right_hand_input_src.map(|src| {
+                    frame.get_pose(&src.grip_space().unwrap(), &base_space).unwrap().xr_into()
+                }),
+            ]
+        }
+        [None, None]
+    }
 
-    fn viewer_target_ray(&self) -> bevy_xr::XrPose{}
-}
+    fn hands_skeleton_pose(&self) -> [Option<Vec<bevy_xr::XrJointPose>>; 2] {
+        todo!()
+    }
 
-pub(crate) fn update_interaction_context(webxr_ctx: ResMut<WebXrContext>) {
-    webxr_ctx.request_animation_frame(|_, frame| webxr_ctx.interaction_ctx.frame = Some(Frame))
+    fn hands_target_ray(&self) -> [Option<bevy_xr::XrPose>; 2] {
+        todo!()
+    }
+
+    fn viewer_target_ray(&self) -> bevy_xr::XrPose {
+        todo!()
+    }
 }

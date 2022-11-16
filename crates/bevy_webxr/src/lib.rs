@@ -67,7 +67,10 @@ pub struct WebXrContext {
 
 impl WebXrContext {
     /// Get a WebXrContext, you must do this in an async function, so you have to call this before `bevy_app::App::run()` in an async main fn and insett it
-    pub async fn get_context(mode: bevy_xr::XrSessionMode, space_type: bevy_xr::interaction::XrReferenceSpaceType) -> Result<Self, JsValue> {
+    pub async fn get_context(
+        mode: bevy_xr::XrSessionMode,
+        space_type: bevy_xr::interaction::XrReferenceSpaceType,
+    ) -> Result<Self, JsValue> {
         let mode = mode.xr_into();
         let window = gloo_utils::window();
         let navigator = window.navigator();
@@ -89,8 +92,10 @@ impl WebXrContext {
 
         let canvas = Canvas::default();
 
-        let space = JsFuture::from(session.request_reference_space(space_type)).await?.dyn_into::<web_sys::XrReferenceSpace>()?;
-        let interaction_ctx = WebXrInteractionContext::new(space, space_type);
+        let space = JsFuture::from(session.request_reference_space(space_type.xr_into()))
+            .await?
+            .dyn_into::<web_sys::XrReferenceSpace>()?;
+        let interaction_ctx = WebXrInteractionContext::new(&session, space_type.xr_into(), space);
 
         Ok(WebXrContext {
             session: Rc::new(RefCell::new(session)),
@@ -130,13 +135,21 @@ impl Plugin for WebXrPlugin {
 
 //TODO: get rid of rcrefcell and use frame.session
 fn webxr_runner(mut app: App) {
-    let webxr_context = app.world.get_non_send_resource::<WebXrContext>().unwrap();
+    let webxr_context = app
+        .world
+        .get_non_send_resource::<WebXrContext>()
+        .unwrap();
     let session = webxr_context.session.clone();
     type XrFrameHandler = Closure<dyn FnMut(f64, web_sys::XrFrame)>;
     let f: Rc<RefCell<Option<XrFrameHandler>>> = Rc::new(RefCell::new(None));
     let g = f.clone();
     let closure_session = session.clone();
-    *g.borrow_mut() = Some(Closure::new(move |_time: f64, _frame: web_sys::XrFrame| {
+    *g.borrow_mut() = Some(Closure::new(move |_time: f64, frame: web_sys::XrFrame| {
+        let mut webxr_context = app
+            .world
+            .get_non_send_resource_mut::<WebXrContext>()
+            .unwrap();
+        webxr_context.interaction_ctx.frame = Some(frame);
         app.update();
 
         let session = closure_session.borrow();
