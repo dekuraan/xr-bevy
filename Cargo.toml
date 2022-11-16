@@ -1574,9 +1574,9 @@ path = "/Users/kevin/.android/release.keystore"
 keystore_password = "android"
 
 [patch.crates-io]
+wgpu = { git = "https://github.com/expenses/wgpu", rev = "d1a9ad7801022d2b733746e9d13152ce2705519b" }
+wgpu-hal = { git = "https://github.com/expenses/wgpu", rev = "d1a9ad7801022d2b733746e9d13152ce2705519b" }
 # wgpu-core = { path = "../wgpu/wgpu-core" }
-# wgpu = { path = "../wgpu/wgpu" }
-# wgpu-hal = { path = "../wgpu/wgpu-hal" }
 
 # uncomment this on macos until openxr sdk is updated with macos buildability
 # [patch.'https://github.com/ralith/openxrs']

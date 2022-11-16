@@ -128,25 +128,11 @@ fn webxr_runner(mut app: App) {
     let g = f.clone();
     let closure_session = session.clone();
     *g.borrow_mut() = Some(Closure::new(move |_time: f64, _frame: web_sys::XrFrame| {
+        //Tick Bevy World
         app.update();
 
         let session = closure_session.borrow();
 
-        // let base_layer = session.render_state().base_layer().unwrap();
-        // //Reflect hack
-        // let framebuffer: web_sys::WebGlFramebuffer =
-        //     js_sys::Reflect::get(&base_layer, &"framebuffer".into())
-        //         .unwrap()
-        //         .into();
-        // gl.bind_framebuffer(
-        //     web_sys::WebGl2RenderingContext::FRAMEBUFFER,
-        //     Some(&framebuffer),
-        // );
-        // gl.clear_color(1.0, 1.0, 0.0, 1.0);
-        // gl.clear(
-        //     web_sys::WebGl2RenderingContext::COLOR_BUFFER_BIT
-        //         | web_sys::WebGl2RenderingContext::DEPTH_BUFFER_BIT,
-        // );
         session.request_animation_frame(f.borrow().as_ref().unwrap().as_ref().unchecked_ref());
     }));
 
@@ -236,3 +222,71 @@ unsafe impl raw_window_handle::HasRawWindowHandle for Canvas {
 //         raw_window_handle::RawDisplayHandle::Web(raw_window_handle::WebDisplayHandle::empty())
 //     }
 // }
+
+pub fn create_view_from_device_framebuffer(
+    device: &wgpu::Device,
+    framebuffer: web_sys::WebGlFramebuffer,
+    base_layer: &web_sys::XrWebGlLayer,
+    format: wgpu::TextureFormat,
+    label: &'static str,
+) -> Texture {
+    Texture::new(unsafe {
+        device.create_texture_from_hal::<wgpu_hal::gles::Api>(
+            wgpu_hal::gles::Texture {
+                inner: wgpu_hal::gles::TextureInner::ExternalFramebuffer { inner: framebuffer },
+                mip_level_count: 1,
+                array_layer_count: 1,
+                format,
+                format_desc: wgpu_hal::gles::TextureFormatDesc {
+                    internal: glow::RGBA,
+                    external: glow::RGBA,
+                    data_type: glow::UNSIGNED_BYTE,
+                },
+                copy_size: wgpu_hal::CopyExtent {
+                    width: base_layer.framebuffer_width(),
+                    height: base_layer.framebuffer_height(),
+                    depth: 1,
+                },
+                is_cubemap: false,
+                drop_guard: None,
+            },
+            &wgpu::TextureDescriptor {
+                label: Some(label),
+                size: wgpu::Extent3d {
+                    width: base_layer.framebuffer_width(),
+                    height: base_layer.framebuffer_height(),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            },
+        )
+    })
+}
+
+pub struct Texture {
+    pub texture: wgpu::Texture,
+    pub view: wgpu::TextureView,
+}
+
+impl Texture {
+    pub fn new(texture: wgpu::Texture) -> Self {
+        Self {
+            view: texture.create_view(&Default::default()),
+            texture,
+        }
+    }
+
+    pub fn new_cubemap(texture: wgpu::Texture) -> Self {
+        Self {
+            view: texture.create_view(&wgpu::TextureViewDescriptor {
+                dimension: Some(wgpu::TextureViewDimension::Cube),
+                ..Default::default()
+            }),
+            texture,
+        }
+    }
+}
