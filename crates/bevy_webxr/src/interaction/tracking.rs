@@ -5,9 +5,11 @@ use wasm_bindgen::JsValue;
 use crate::XrInto;
 
 use web_sys::{
-    DomPointReadOnly, XrBoundedReferenceSpace, XrFrame, XrHandedness, XrInputSourceArray, XrPose,
-    XrReferenceSpace, XrReferenceSpaceType, XrSession,
+    DomPointReadOnly, XrBoundedReferenceSpace, XrFrame, XrHandedness, XrInputSourceArray,
+    XrJointSpace, XrReferenceSpace, XrReferenceSpaceType, XrSession, XrView, XrHand,
 };
+
+use js_sys::Object;
 
 pub struct WebXrInteractionContext {
     space_type: XrReferenceSpaceType,
@@ -72,31 +74,99 @@ impl bevy_xr::interaction::implementation::XrTrackingSourceBackend for TrackingS
     }
 
     fn views_poses(&self) -> Vec<bevy_xr::XrPose> {
-        todo!()
+        if let Some(frame) = &self.context.frame {
+            let space = self.context.space.clone();
+            let space = space.lock().unwrap();
+
+            if let Some(viewer_pose) = frame.get_viewer_pose(&space) {
+                return viewer_pose
+                    .views()
+                    .to_vec()
+                    .iter()
+                    .map(|js_value| XrView::from(js_value.clone()))
+                    .map(|view| bevy_xr::XrPose {
+                        transform: view.transform().xr_into(),
+                        linear_velocity: None,
+                        angular_velocity: None,
+                        emulated_position: viewer_pose.emulated_position(),
+                    })
+                    .collect();
+            }
+        }
+        vec![]
     }
 
     fn hands_pose(&self) -> [Option<bevy_xr::XrPose>; 2] {
         if let Some(frame) = &self.context.frame {
-            let left_hand_input_src = {self.context.sources.clone()}.lock().unwrap().get(0);
-            let right_hand_input_src = {self.context.sources.clone()}.lock().unwrap().get(1);
+            let left_hand_input_src = { self.context.sources.clone() }.lock().unwrap().get(0);
+            let right_hand_input_src = { self.context.sources.clone() }.lock().unwrap().get(1);
 
             let base_space = self.context.space.clone();
             let base_space = base_space.lock().unwrap();
 
             return [
                 left_hand_input_src.map(|src| {
-                    frame.get_pose(&src.grip_space().unwrap(), &base_space).unwrap().xr_into()
+                    frame
+                        .get_pose(&src.grip_space().unwrap(), &base_space)
+                        .unwrap()
+                        .xr_into()
                 }),
                 right_hand_input_src.map(|src| {
-                    frame.get_pose(&src.grip_space().unwrap(), &base_space).unwrap().xr_into()
+                    frame
+                        .get_pose(&src.grip_space().unwrap(), &base_space)
+                        .unwrap()
+                        .xr_into()
                 }),
-            ]
+            ];
         }
         [None, None]
     }
 
     fn hands_skeleton_pose(&self) -> [Option<Vec<bevy_xr::XrJointPose>>; 2] {
-        todo!()
+        if let Some(frame) = &self.context.frame {
+            let left_hand_input_src = { self.context.sources.clone() }.lock().unwrap().get(0);
+            let right_hand_input_src = { self.context.sources.clone() }.lock().unwrap().get(1);
+
+            let base_space = self.context.space.clone();
+            let base_space = base_space.lock().unwrap();
+
+            return [
+                left_hand_input_src.map(|src| {
+                    Object::values(
+                        <XrHand as AsRef<Object>>::as_ref(&src.hand().unwrap())
+                    )
+                    .to_vec()
+                    .iter()
+                    .map(|js_value| XrJointSpace::from(js_value.clone()))
+                    .map(|joint_space| {
+                        frame
+                            .get_joint_pose(&joint_space, &base_space)
+                            .unwrap()
+                            .xr_into()
+                    })
+                    .collect()
+
+                }),
+                right_hand_input_src.map(|src| {
+                    Object::values(
+                        <XrHand as AsRef<Object>>::as_ref(&src.hand().unwrap())
+                    )
+                    .to_vec()
+                    .iter()
+                    .map(|js_value| XrJointSpace::from(js_value.clone()))
+                    .map(|joint_space| {
+                        frame
+                            .get_joint_pose(&joint_space, &base_space)
+                            .unwrap()
+                            .xr_into()
+                    })
+                    .collect()
+
+                }),
+            ];
+        }
+
+        [None, None]
     }
 
     fn hands_target_ray(&self) -> [Option<bevy_xr::XrPose>; 2] {

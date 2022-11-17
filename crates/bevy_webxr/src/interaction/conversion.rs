@@ -1,7 +1,9 @@
 use crate::{XrFrom, XrInto};
 use bevy_math::{Quat, Vec3};
 
-use web_sys::{DomPointInit, XrHandedness, XrPose, XrReferenceSpaceType, XrRigidTransform};
+use web_sys::{
+    DomPointInit, XrHandedness, XrJointPose, XrPose, XrReferenceSpaceType, XrRigidTransform,
+};
 
 impl XrFrom<XrRigidTransform> for bevy_xr::interaction::XrRigidTransform {
     fn xr_from(rigid_transform: XrRigidTransform) -> Self {
@@ -54,6 +56,24 @@ impl XrFrom<XrPose> for bevy_xr::interaction::XrPose {
                 .angular_velocity()
                 .map(|point| Vec3::new(point.x() as f32, point.y() as f32, point.z() as f32)),
             emulated_position: pose.emulated_position(),
+        }
+    }
+}
+
+impl XrFrom<XrJointPose> for bevy_xr::interaction::XrJointPose {
+    fn xr_from(pose: XrJointPose) -> Self {
+        bevy_xr::interaction::XrJointPose {
+            pose: bevy_xr::interaction::XrPose {
+                transform: pose.transform().xr_into(),
+                linear_velocity: pose
+                    .linear_velocity()
+                    .map(|point| Vec3::new(point.x() as f32, point.y() as f32, point.z() as f32)),
+                angular_velocity: pose
+                    .angular_velocity()
+                    .map(|point| Vec3::new(point.x() as f32, point.y() as f32, point.z() as f32)),
+                emulated_position: pose.emulated_position(),
+            },
+            radius: pose.radius(),
         }
     }
 }

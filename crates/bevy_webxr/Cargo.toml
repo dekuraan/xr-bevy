@@ -49,6 +49,8 @@ features = [
     "XrInputSourceEventInit",
     "XrInputSourcesChangeEvent",
     "XrInputSourcesChangeEventInit",
+    "XrJointPose",
+    "XrJointSpace",
     "XrPose",
     "XrReferenceSpace",
     "XrBoundedReferenceSpace",

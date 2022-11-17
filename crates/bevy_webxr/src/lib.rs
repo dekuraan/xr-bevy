@@ -135,10 +135,7 @@ impl Plugin for WebXrPlugin {
 
 //TODO: get rid of rcrefcell and use frame.session
 fn webxr_runner(mut app: App) {
-    let webxr_context = app
-        .world
-        .get_non_send_resource::<WebXrContext>()
-        .unwrap();
+    let webxr_context = app.world.get_non_send_resource::<WebXrContext>().unwrap();
     let session = webxr_context.session.clone();
     type XrFrameHandler = Closure<dyn FnMut(f64, web_sys::XrFrame)>;
     let f: Rc<RefCell<Option<XrFrameHandler>>> = Rc::new(RefCell::new(None));
