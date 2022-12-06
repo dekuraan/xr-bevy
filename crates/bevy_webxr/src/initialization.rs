@@ -3,9 +3,12 @@ use bevy_ecs::system::Resource;
 use wasm_bindgen::JsCast;
 
 pub async fn initialize_webxr() -> InitializedState {
-    let webxr_context = WebXrContext::get_context(bevy_xr::XrSessionMode::ImmersiveVR)
-        .await
-        .unwrap();
+    let webxr_context = WebXrContext::get_context(
+        bevy_xr::XrSessionMode::ImmersiveVR,
+        bevy_xr::XrReferenceSpaceType::Stage,
+    )
+    .await
+    .unwrap();
 
     let webgl2_context = webxr_context.canvas.create_webgl2_context();
 

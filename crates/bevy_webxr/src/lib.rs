@@ -15,6 +15,7 @@ use bevy_render::{
 };
 use bevy_utils::Uuid;
 use initialization::InitializedState;
+use interaction::TrackingSource;
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::XrWebGlLayer;
@@ -138,8 +139,18 @@ fn webxr_runner(mut app: App) {
     type XrFrameHandler = Closure<dyn FnMut(f64, web_sys::XrFrame)>;
     let f: Rc<RefCell<Option<XrFrameHandler>>> = Rc::new(RefCell::new(None));
     let g: Rc<RefCell<Option<XrFrameHandler>>> = f.clone();
+
+
     *g.borrow_mut() = Some(Closure::new(move |_time: f64, frame: web_sys::XrFrame| {
         app.world.insert_non_send_resource(frame.clone());
+
+        let (space, space_type) = webxr_context.space_info.clone();
+        // update the current frame inside tracking soource
+        let tracking_source = TrackingSource::new(space, space_type, frame.clone());
+        // Resource used to track poses
+        app.world
+            .insert_resource(bevy_xr::XrTrackingSource::new(Box::new(tracking_source)));
+
         app.update();
 
         let session = frame.session();
