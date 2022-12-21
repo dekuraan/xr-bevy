@@ -103,26 +103,30 @@ impl XrFrom<web_sys::XrRigidTransform> for bevy_xr::interaction::XrRigidTransfor
 
 impl XrFrom<web_sys::XrRigidTransform> for bevy_transform::components::Transform {
     fn xr_from(rigid_transform: web_sys::XrRigidTransform) -> Self {
-        bevy_transform::components::Transform {
-            translation: rigid_transform.orientation().xr_into(),//: rigid_transform.position().xr_into(),
-            rotation: rigid_transform.position().xr_into(),
+
+        let mut transform = bevy_transform::components::Transform {
+            translation: rigid_transform.position().xr_into(),
+            rotation: rigid_transform.orientation().xr_into(),
             ..Default::default()
-        }
+        };
+
+        transform
+
     }
 }
 
 impl XrFrom<web_sys::DomPointReadOnly> for bevy_math::Vec3 {
     fn xr_from(point: web_sys::DomPointReadOnly) -> Self {
-        bevy_math::Vec3::new(point.x() as f32, point.y() as f32, point.z() as f32)
+        bevy_math::Vec3::new(point.x() as f32, -point.y() as f32, point.z() as f32)
     }
 }
 
 impl XrFrom<web_sys::DomPointReadOnly> for bevy_math::Quat {
     fn xr_from(point: web_sys::DomPointReadOnly) -> Self {
         bevy_math::Quat::from_xyzw(
-            point.x() as f32,
+            -point.x() as f32,
             point.y() as f32,
-            point.z() as f32,
+            -point.z() as f32,
             point.w() as f32,
         )
     }
